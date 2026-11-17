@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # run with python -I
 from build import ASCENT, DESCENT, STRIKE_PPEM
 from emoji import Shaper, sequences
 
-# Text with emoji between other characters: ZWJ, skin tone, flag, keycap, VS16.
+# One sequence of each kind: VS16, skin tone, flag, keycap, subdivision flag.
 SAMPLES = {
     "❤️": "u2764",
     "\U0001f44d\U0001f3fd": None,
@@ -64,6 +64,10 @@ class Checks:
         self.expect(ppems == [STRIKE_PPEM], f"strikes: {ppems}")
         hhea = font["hhea"]
         self.expect((hhea.ascent, hhea.descent) == (ASCENT, DESCENT), f"hhea: {hhea.ascent} {hhea.descent}")
+        # Paint.hasGlyph() needs base + FE0F in cmap format 14, as the stock font has.
+        built, stock = _fe0f_bases(font), _fe0f_bases(TTFont(self.src / "NotoColorEmoji.ttf"))
+        missing = sorted(hex(b) for b in stock - built)
+        self.expect(bool(stock) and not missing, f"FE0F sequences missing from cmap 14: {missing}")
 
     def sequences(self):
         """GSUB in the new font gives the glyph that morx gives in the source font."""
@@ -107,6 +111,15 @@ class Checks:
         self.count += 1
         if not ok:
             self.failures.append("FAIL " + message)
+
+
+def _fe0f_bases(font: TTFont) -> set:
+    return {
+        base
+        for table in font["cmap"].tables
+        if table.format == 14
+        for base, _ in table.uvsDict.get(0xFE0F, [])
+    }
 
 
 if __name__ == "__main__":

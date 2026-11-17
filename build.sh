@@ -8,7 +8,6 @@ version=$(sed -n 's/^version=//p' module/module.prop)
 run() { uv run -q --project build python -I "$@"; }
 
 build/fetch.sh
-run build/build.py build/cache/src/AppleColorEmoji-Linux.ttf build/cache/src/emoji-test.txt \
-	build/cache/out/AppleColorEmoji.ttf
+run build/build.py build/cache/src build/cache/out/AppleColorEmoji.ttf
 run build/verify.py build/cache/src build/cache/out/AppleColorEmoji.ttf
 run build/package.py module build/cache/out/AppleColorEmoji.ttf "$out/apple-emoji-$version.zip"

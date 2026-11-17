@@ -2,7 +2,7 @@
 # fontTools tables are dynamic; pyright cannot see their attributes.
 """Make an Android emoji font from the Linux build of apple-emoji-ttf.
 
-Usage: build.py SRC_FONT EMOJI_TEST OUT_FONT
+Usage: build.py SRC_DIR OUT_FONT
 
 The source font is CBDT (color PNG bitmaps), which Android reads, but it forms
 ZWJ sequences, skin tones and flags with the AAT morx table. Android's emoji
@@ -14,7 +14,9 @@ fonts use GSUB. The build:
   - sets the vertical metrics of NotoColorEmojiFlags, so that lines with emoji
     are not taller than with the stock font,
   - maps all tag characters (U+E0020-E007F) to an empty glyph, as Noto does,
-  - adds Windows name records.
+  - adds a cmap format 14 subtable with the emoji variation sequences (FE0F).
+    Without it, Paint.hasGlyph() is false for text such as U+2764 U+FE0F,
+  - replaces the Windows name records.
 """
 
 import sys
@@ -23,9 +25,10 @@ from pathlib import Path
 from fontTools.otlLib.builder import buildLigatureSubstSubtable, buildLookup
 from fontTools.ttLib import TTFont, newTable
 from fontTools.ttLib.tables import otTables as ot
+from fontTools.ttLib.tables._c_m_a_p import CmapSubtable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # run with python -I
-from emoji import Shaper, sequences
+from emoji import Shaper, emoji_style_bases, sequences
 
 STRIKE_PPEM = 96
 # NotoColorEmojiFlags.ttf, which has the same units per em (2048).
@@ -35,15 +38,17 @@ TAGS = range(0xE0020, 0xE0080)
 FAMILY = "Apple Color Emoji"
 
 
-def main(src: Path, emoji_test: Path, out: Path):
+def main(src_dir: Path, out: Path):
+    src = src_dir / "AppleColorEmoji-Linux.ttf"
     font = TTFont(src)
-    ligatures = aat_ligatures(src, font, emoji_test)
+    ligatures = aat_ligatures(src, font, src_dir / "emoji-test.txt")
     keep_strike(font, STRIKE_PPEM)
     for tag in AAT_TABLES:
         if tag in font:
             del font[tag]
     add_gsub(font, ligatures)
     add_tags(font)
+    add_variations(font, emoji_style_bases(src_dir / "emoji-variation-sequences.txt"))
     set_metrics(font)
     add_names(font)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -143,6 +148,19 @@ def add_tags(font: TTFont):
                 table.cmap.setdefault(point, empty)
 
 
+def add_variations(font: TTFont, bases: set):
+    """Add base + FE0F as default variation sequences: the base glyph is the emoji."""
+    cmap = font.getBestCmap() or {}
+    missing = sorted(hex(b) for b in bases - set(cmap))
+    if missing:
+        sys.exit(f"emoji variation bases without a glyph: {missing}")
+    table = CmapSubtable.newSubtable(14)
+    table.platformID, table.platEncID, table.language = 0, 5, 0xFF
+    table.cmap = {}
+    table.uvsDict = {0xFE0F: [(base, None) for base in sorted(bases)]}
+    font["cmap"].tables.append(table)
+
+
 def set_metrics(font: TTFont):
     hhea, os2 = font["hhea"], font["OS/2"]
     hhea.ascent, hhea.descent, hhea.lineGap = ASCENT, DESCENT, 0
@@ -151,8 +169,9 @@ def set_metrics(font: TTFont):
 
 
 def add_names(font: TTFont):
-    """Add Windows names. The source has Macintosh names only."""
+    """Replace the Windows names with English ones. The source has only localized style names."""
     name = font["name"]
+    name.names = [record for record in name.names if record.platformID != 3]
     mac = {record.nameID: str(record) for record in name.names if record.platformID == 1}
     for name_id in (0, 3, 5):
         if name_id in mac:
@@ -164,4 +183,4 @@ def add_names(font: TTFont):
 
 
 if __name__ == "__main__":
-    main(*(Path(arg) for arg in sys.argv[1:4]))
+    main(Path(sys.argv[1]), Path(sys.argv[2]))

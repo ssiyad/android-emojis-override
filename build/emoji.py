@@ -1,6 +1,6 @@
 # pyright: reportAttributeAccessIssue=false
 # uharfbuzz is a compiled module without type stubs.
-"""Emoji test sequences from Unicode's emoji-test.txt, and HarfBuzz shaping of them."""
+"""Emoji sequences from the Unicode data files, and HarfBuzz shaping of them."""
 
 from pathlib import Path
 
@@ -17,6 +17,18 @@ def sequences(path: Path) -> list:
         status, _, name = rest.partition("#")
         found.append((tuple(int(p, 16) for p in points.split()), status.strip(), name.strip()))
     return found
+
+
+def emoji_style_bases(path: Path) -> set:
+    """Return the base characters of the emoji style sequences (base + FE0F)."""
+    bases = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("#") or ";" not in line:
+            continue
+        base, selector = line.split(";", 1)[0].split()
+        if selector == "FE0F":
+            bases.add(int(base, 16))
+    return bases
 
 
 class Shaper:

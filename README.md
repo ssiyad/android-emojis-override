@@ -1,8 +1,8 @@
 # Apple Emoji
 
 A KernelSU module for the Nothing Phone (4a) on LineageOS 23.2. It replaces the
-system emoji font (`NotoColorEmoji.ttf`) with Apple Color Emoji (macOS 26,
-Unicode 17.0).
+system emoji font (`NotoColorEmoji.ttf`) with Apple Color Emoji from macOS 26
+(Unicode 17.0).
 
 Apple Color Emoji belongs to Apple Inc. and has no license for use outside
 Apple products. Build the module for your own phone, and do not publish the zip.
@@ -22,8 +22,9 @@ that are open. The log is `/data/local/tmp/apple-emoji.log`.
 
 - `post-fs-data.sh` bind-mounts `AppleColorEmoji.ttf` over each target in
   `emoji.list`. The font XMLs do not change.
-- `NotoColorEmojiFlags.ttf` stays. It comes after `NotoColorEmoji.ttf` in the
-  fallback order, and the Apple font has all flags, so it is not used.
+- `NotoColorEmojiFlags.ttf` stays. For valid flags, the Apple font wins,
+  because it comes first in the fallback order. Pairs of regional indicators
+  that are not a flag still show the Noto "unknown flag" glyph.
 - If a boot does not complete, the next boot mounts nothing and the module
   disables itself. `service.sh` clears the guard after the boot completes. To
   use the module again, enable it in the KernelSU manager.
@@ -39,12 +40,16 @@ with the AAT `morx` table. `build/build.py` changes it for Android:
   and writes the results as GSUB `ccmp` ligatures, as Noto Color Emoji does.
 - It keeps only the 96 ppem strike, the largest one. Android scales it.
 - It removes the AAT tables (`morx`, `feat`, `trak`, ...).
+- It adds the emoji variation sequences (U+FE0F) in a cmap format 14
+  subtable, as Noto has them. `Paint.hasGlyph()` needs them, for example for
+  U+2764 U+FE0F.
 - It sets the ascent and descent of `NotoColorEmojiFlags.ttf`, so that lines
   with emoji are not taller than before.
 
 `build/verify.py` checks the font with the OpenType Sanitizer, checks that each
 sequence of `emoji-test.txt` gives the same glyph as `morx`, and checks that
-each character and sequence of the stock emoji fonts is in the new font.
+each character, sequence and variation sequence of the stock emoji fonts is
+in the new font.
 
 ## Known limits
 
