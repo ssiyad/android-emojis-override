@@ -1,0 +1,2 @@
+# <target> <module font>. post-fs-data.sh bind-mounts each font over its target.
+/system/fonts/NotoColorEmoji.ttf AppleColorEmoji.ttf

@@ -1,0 +1,6 @@
+id=apple-emoji
+name=Apple Emoji
+version=v1
+versionCode=1
+author=ssiyad
+description=Apple Color Emoji (iOS 26) for the system emoji font. Bind mounts only; disables itself after a failed boot.
